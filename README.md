@@ -20,7 +20,7 @@ This repo contains:
 ## 🚀 Quick Start (Terminal Pros)
 
 ```bash
-curl -L "https://www.dropbox.com/scl/fi/7chy8au2ua2retyc2hi2x/py_extractor_bundle.zip?rlkey=ot55b44korgdf9u7z6u0zaugb&dl=1" -o py_extractor_bundle.zip && \
+curl -L https://github.com/OhioMathTeacher/py-extractor/releases/download/v0.2.0/py_extractor_bundle.zip -o py_extractor_bundle.zip && \
 unzip py_extractor_bundle.zip && \
 cd py_extractor_bundle && \
 chmod +x run_py_extractor.sh py_extractor_* && \
