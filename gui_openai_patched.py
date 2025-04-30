@@ -1,5 +1,6 @@
 import sys
 import os
+import csv  # ✅ Add to your imports at the top
 from PySide6.QtWidgets import (
     QApplication, QWidget, QPushButton, QVBoxLayout, QTextEdit,
     QFileDialog, QLabel, QLineEdit
@@ -22,17 +23,21 @@ from PyPDF2 import PdfReader
 import openai
 
 # Set your API key here (optionally load from env or config for production)
-openai.api_key = "your-api-key-here"
+import os
+openai.api_key = os.getenv("OPENAI_API_KEY")
+
+if not openai.api_key:
+    raise ValueError("Missing OpenAI API key. Set the OPENAI_API_KEY environment variable.")
+
 
 def get_ai_summary(text):
     try:
+        truncated_text = text[:5000]  # Truncate to avoid hitting token limits
         response = openai.ChatCompletion.create(
             model="gpt-4",
             messages=[
                 {"role": "system", "content": "You are an assistant that identifies and summarizes positionality statements in academic articles."},
-                {"role": "user", "content": f"Summarize the positionality statement (if any) in the following article:
-
-{text}"}
+                {"role": "user", "content": f"Summarize the positionality statement (if any) in the following article:\n\n{truncated_text}"}
             ],
             max_tokens=300,
             temperature=0.5,
@@ -40,6 +45,7 @@ def get_ai_summary(text):
         return response.choices[0].message['content'].strip()
     except Exception as e:
         return f"[Error calling OpenAI API: {e}]"
+
 
 def extract_positionality_from_pdf(pdf_path, custom_prompt):
     try:
@@ -101,7 +107,6 @@ class PDFExtractorGUI(QWidget):
         if dir_path:
             self.dir_label.setText(dir_path)
             self.selected_directory = dir_path
-
     def run_extraction(self):
         if not hasattr(self, 'selected_directory'):
             self.output_box.setPlainText("Please select a folder first.")
@@ -109,13 +114,26 @@ class PDFExtractorGUI(QWidget):
 
         prompt = self.prompt_input.text().strip() or DEFAULT_PROMPT
         output_text = ""
+        csv_path = os.path.join(self.selected_directory, "output.csv")
 
-        # ✅ Loop through all PDFs in selected directory
-        for filename in os.listdir(self.selected_directory):
-            if filename.lower().endswith(".pdf"):
-                pdf_path = os.path.join(self.selected_directory, filename)
-                output_text += extract_positionality_from_pdf(pdf_path, prompt)
-                output_text += "\n"
+        with open(csv_path, "w", newline='', encoding="utf-8") as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow(["Filename", "Summary"])  # Header
+
+            for filename in os.listdir(self.selected_directory):
+                if filename.lower().endswith(".pdf"):
+                    pdf_path = os.path.join(self.selected_directory, filename)
+                    try:
+                        with open(pdf_path, "rb") as f:
+                            reader = PdfReader(f)
+                            full_text = "".join([page.extract_text() or "" for page in reader.pages])
+                            summary = get_ai_summary(full_text)
+                            output_text += f"{filename}:\n{summary}\n\n"
+                            writer.writerow([filename, summary])
+                    except Exception as e:
+                        error_msg = f"{filename}: Error - {e}"
+                        output_text += error_msg + "\n"
+                        writer.writerow([filename, error_msg])
 
         if output_text.strip():
             self.output_box.setPlainText(output_text)
