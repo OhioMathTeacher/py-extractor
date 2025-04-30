@@ -9,7 +9,7 @@ This tool was designed for large-scale qualitative research in educational schol
 
 This repo contains:
 
-- 🖥️ `py_extractor_x86_64` — for **Intel-based Macs**
+- 💽 `py_extractor_x86_64` — for **Intel-based Macs**
 - 🍏 `py_extractor_arm64` — for **Apple Silicon Macs** (M1/M2)
 - 🧠 `run_py_extractor.sh` — a smart launcher that auto-detects your system and runs the right version
 - 📂 `README.txt` — basic usage and support info
@@ -20,7 +20,7 @@ This repo contains:
 ## 🚀 Quick Start (Terminal Pros)
 
 ```bash
-curl -L https://github.com/OhioMathTeacher/py-extractor/releases/download/v0.2.0/py_extractor_bundle.zip -o py_extractor_bundle.zip && \
+curl -L https://github.com/Technology-Educators-Alliance/py-extractor/releases/download/v0.2.0/py_extractor_bundle.zip -o py_extractor_bundle.zip && \
 unzip py_extractor_bundle.zip && \
 cd py_extractor_bundle && \
 chmod +x run_py_extractor.sh py_extractor_* && \
@@ -55,6 +55,6 @@ You may remix, adapt, and use the code for non-commercial purposes, with attribu
 
 ---
 
-## 👤 Author
+## 👥 Project Maintainer
 
-Developed by [@OhioMathTeacher](https://github.com/OhioMathTeacher)
+Maintained by [Technology Educators Alliance](https://github.com/Technology-Educators-Alliance)
