@@ -1,6 +1,6 @@
 # py-extractor
 
-**Extract positionality statements and other targeted content from PDFs using AI.**  
+**Extract targeted content from PDFs using AI.**  
 This tool was designed for large-scale qualitative research in educational scholarship, but can be adapted for other domains.
 
 ---
