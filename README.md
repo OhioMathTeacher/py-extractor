@@ -46,15 +46,13 @@ chmod +x run_py_extractor.sh py_extractor_* && \
 
 ---
 
-## ❗ License
+### 🖥️ CLI Version (Python Script)
 
-This project is licensed under a **Creative Commons Attribution–NonCommercial 4.0 International (CC BY-NC 4.0)** license.  
-You may remix, adapt, and use the code for non-commercial purposes, with attribution.
+The original command-line version of the extractor is located here:
 
-📄 See [`LICENSE.txt`](LICENSE.txt) for details.
+[`cli/py_extractor02v2.py`](https://github.com/Technology-Educators-Alliance/py-extractor/blob/main/cli/py_extractor02v2.py)
 
----
-
-## 👥 Project Maintainer
-
-Maintained by [Technology Educators Alliance](https://github.com/Technology-Educators-Alliance)
+To run it:
+```bash
+python3 py_extractor02v2.py
+```
