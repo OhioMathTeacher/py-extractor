@@ -1,63 +1,69 @@
-# Search Buddy (py-extractor)
+# 🧠 Search Buddy (`py-extractor`)
 
-**Extract targeted content from PDFs using AI or keyword search via a simple GUI (or a CLI).**
+Extract **targeted content** from PDFs using AI or keyword search — via a simple **GUI** or **CLI**.
 
-Originally designed for large-scale qualitative research in educational scholarship, this tool now features a full Python GUI for positionality and metadata extraction.
+Originally built for large-scale qualitative research in educational scholarship, this Python app now includes a full-featured graphical interface for:
 
----
+- 🧑‍🏫 Positionality statement detection  
+- 📄 Metadata & DOI extraction  
+- 📄 CSV export with live debug tracking
 
-## 🚀 Quick Setup (GUI)
-
-1. **Clone the repo**
-
-   ```bash
-   git clone https://github.com/Technology-Educators-Alliance/py-extractor.git
-   cd py-extractor
-   ```
-
-2. **Create & activate a clean Python virtualenv**
-
-   ```bash
-   python3 -m venv venv
-   # macOS/Linux
-   source venv/bin/activate
-   # Windows PowerShell
-   .\venv\Scripts\Activate.ps1
-   ```
-
-3. **Install dependencies**
-
-   ```bash
-   pip install --upgrade pip
-   pip install -r requirements.txt
-   ```
-
-4. **Run the GUI**
-
-   ```bash
-   python gui_openai_05_06_25v3.py
-   ```
-
-   * Paste your OpenAI API Key into the **API Key** field (password‑masked).
-   * Select your PDF folder.
-   * Click **Run Extraction** and watch the `%` update in the status bar.
-   * When finished, `output.csv` will appear in your PDF folder.
+> 🚀 **[Latest Release: v0.3.5](https://github.com/Technology-Educators-Alliance/py-extractor/releases/latest)** — with improved debug output and one-click CSV download.
 
 ---
 
-## 🖥️ Command‑Line Interface (CLI)
+## 🛠️ Quick Setup (GUI)
 
-If you prefer terminal pros:
+### 1. Clone the repo
 
 ```bash
-# Navigate into the CLI folder
-cd cli
+git clone https://github.com/Technology-Educators-Alliance/py-extractor.git
+cd py-extractor
+```
 
-# Run the original Python script
+### 2. Create and activate a virtual environment
+
+```bash
+python3 -m venv venv
+# macOS/Linux
+source venv/bin/activate
+# Windows PowerShell
+.\venv\Scripts\Activate.ps1
+```
+
+### 3. Install dependencies
+
+```bash
+pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+### 4. Run the GUI
+
+```bash
+python gui_openai_05_06_25v5.py
+```
+
+**Features:**
+
+- 🔑 Enter OpenAI API key (masked)
+- 📁 Choose a folder of PDFs
+- 🟢 Click **Run Extraction**
+- 🢾 Follow the debug output as it runs
+- 🥃 Click **Download CSV** when done!
+
+---
+
+## 💻 Command-Line Interface (CLI)
+
+For power users and scripting workflows:
+
+```bash
+cd cli
 python py_extractor02v2.py /path/to/your/pdfs --mode ai
 ```
 
-Use `--help` for full options:
+Use `--help` for options:
 
 ```bash
 python py_extractor02v2.py --help
@@ -65,42 +71,24 @@ python py_extractor02v2.py --help
 
 ---
 
-## 🧰 What’s Inside
+## 📦 Key Files
 
-* **`gui_openai_05_06_25v3.py`**
-  The current GUI launcher with:
-
-  * Persistent folder & API‑Key storage via QSettings
-  * AI‑supported positionality extraction (GPT‑4O) + regex fallback
-  * Metadata pipeline (PyMuPDF → PyPDF2 → pdfplumber header/footer → Crossref)
-
-* **`metadata_extractor.py`**
-  Central helper module:
-
-  * `extract_metadata(pdf_path)` including embedded‑metadata, header/footer scraping, DOI/Crossref lookup.
-
-* **`setup_instructions.md`**
-  A < 30‑minute quickstart guide for any laptop.
-
-* **`requirements.txt`**
-  Lists all Python dependencies:
-
-  ```
-  PySide6
-  pymupdf
-  PyPDF2
-  pdfplumber
-  requests
-  openai
-  ```
-
-* **`cli/py_extractor02v2.py`**
-  Legacy CLI script for headless environments.
+| File | Purpose |
+|------|---------|
+| `gui_openai_05_06_25v5.py` | Main GUI with OpenAI + debug + CSV |
+| `metadata_extractor.py` | Shared helper for extracting headers, footers, metadata, DOIs |
+| `requirements.txt` | Dependencies: PySide6, PyMuPDF, pdfplumber, etc. |
+| `cli/py_extractor02v2.py` | CLI version for headless/automated use |
+| `setup_instructions.md` | One-page guide for quick onboarding |
 
 ---
 
-## 📄 License
+## 🪪 License
 
-This project is licensed **CC BY‑NC 4.0** for **non‑commercial, educational** use only. See [LICENSE.txt](LICENSE.txt) for details.
+Licensed under **CC BY-NC 4.0**  
+For non-commercial, educational use only.  
+See [LICENSE.txt](LICENSE.txt) for full details.
 
-*Happy extracting!* 🧙‍♂️
+---
+
+Happy extracting! 🧙‍♂️📚🔍
