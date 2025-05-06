@@ -6,13 +6,15 @@ Originally built for large-scale qualitative research in educational scholarship
 
 - 🧑‍🏫 Positionality statement detection  
 - 📄 Metadata & DOI extraction  
-- 📄 CSV export with live debug tracking
+- 📤 CSV export with live debug tracking
 
 > 🚀 **[Latest Release: v0.3.5](https://github.com/Technology-Educators-Alliance/py-extractor/releases/latest)** — with improved debug output and one-click CSV download.
 
+> ⚠️ **Known Issue:** This version still needs work on the search routines. For example, the positionality statement in `dean-2017-identity-negotiation.pdf` is not currently being detected by v0.3.5.
+
 ---
 
-## 🛠️ Quick Setup (GUI)
+## 🧰 Quick Setup (GUI)
 
 ### 1. Clone the repo
 
@@ -49,8 +51,8 @@ python gui_openai_05_06_25v5.py
 - 🔑 Enter OpenAI API key (masked)
 - 📁 Choose a folder of PDFs
 - 🟢 Click **Run Extraction**
-- 🢾 Follow the debug output as it runs
-- 🥃 Click **Download CSV** when done!
+- 🧾 Follow the debug output as it runs
+- 🧃 Click **Download CSV** when done!
 
 ---
 
