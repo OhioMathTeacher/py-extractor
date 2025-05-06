@@ -48,7 +48,7 @@ def extract_metadata_pypdf2(pdf_path):
 
 def scrape_header_footer(pdf_path):
     """
-    Scan first 3 and last 3 pages for "Journal, Vol X, Iss Y" pattern.
+    Scan first 3 and last 3 pages for "Journal, Vol X, Issue Y" pattern.
     """
     pattern = re.compile(
         r"(?P<journal>[A-Za-z &\-:]+),?\s*Vol(?:ume)?\.?\s*(?P<volume>\d+),?\s*Iss(?:ue)?\.?\s*(?P<issue>\d+)",
@@ -101,24 +101,51 @@ def crossref_lookup(doi):
         return {}
 
 
+def crossref_lookup_by_title(title):
+    """
+    Query Crossref’s bibliographic endpoint for the given title.
+    Returns dict with keys journal, volume, issue, author.
+    """
+    result = {}
+    try:
+        if not title:
+            return result
+        from urllib.parse import quote_plus
+        q = quote_plus(title)
+        url = f"https://api.crossref.org/works?query.bibliographic={q}&rows=1"
+        headers = {"User-Agent": "SearchBuddy/1.0 (mailto:todd@miamioh.edu)"}
+        resp = requests.get(url, headers=headers, timeout=10)
+        resp.raise_for_status()
+        items = resp.json().get("message", {}).get("items", [])
+        if not items:
+            return result
+        msg = items[0]
+        result["journal"] = msg.get("container-title", [None])[0]
+        result["volume"]  = msg.get("volume")
+        result["issue"]   = msg.get("issue")
+        authors = msg.get("author", [])
+        result["author"] = "; ".join([f"{a.get('given','')} {a.get('family','')}".strip() for a in authors])
+    except Exception:
+        pass
+    return result
+
+
 def extract_metadata(pdf_path):
     """
-    Master metadata extractor: embedded -> PyPDF2 -> header/footer -> Crossref.
+    Master metadata extractor: embedded -> PyPDF2 -> header/footer -> DOI -> title-search.
+    Returns merged metadata dict.
     """
     meta = extract_metadata_pymupdf(pdf_path)
-    # Fallback to PyPDF2 for title/author if missing
     if not meta.get("title") or not meta.get("author"):
         fallback = extract_metadata_pypdf2(pdf_path)
         for k, v in fallback.items():
             if not meta.get(k) and v:
                 meta[k] = v
-    # Header/footer scrape
     if not meta.get("journal") or not meta.get("volume"):
         hdr = scrape_header_footer(pdf_path)
         for k in ("journal", "volume", "issue"):
             if not meta.get(k) and hdr.get(k):
                 meta[k] = hdr[k]
-    # Crossref lookup
     if not meta.get("journal") or not meta.get("volume") or not meta.get("author"):
         doi = extract_doi(pdf_path)
         if doi:
@@ -126,4 +153,10 @@ def extract_metadata(pdf_path):
             for k, v in cr.items():
                 if not meta.get(k) and v:
                     meta[k] = v
+    # Title-search fallback
+    if not meta.get("journal") or not meta.get("volume") or not meta.get("author"):
+        title_cr = crossref_lookup_by_title(meta.get("title", ""))
+        for k in ("journal", "volume", "issue", "author"):
+            if not meta.get(k) and title_cr.get(k):
+                meta[k] = title_cr[k]
     return meta
