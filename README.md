@@ -16,11 +16,19 @@ Originally built for large-scale qualitative research in educational scholarship
 
 ## 🧰 Quick Setup (GUI)
 
-### 1. Clone the repo
+### 1. Clone or Update the Repo
+
+If you haven't already cloned the repo:
 
 ```bash
 git clone https://github.com/Technology-Educators-Alliance/py-extractor.git
 cd py-extractor
+```
+
+If you've already cloned it, update to the latest version:
+
+```bash
+git pull origin main
 ```
 
 ### 2. Create and Activate a Virtual Environment
