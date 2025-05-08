@@ -23,15 +23,34 @@ git clone https://github.com/Technology-Educators-Alliance/py-extractor.git
 cd py-extractor
 ```
 
-### 2. Create and activate a virtual environment
+### 2. Create and Activate a Virtual Environment
+
+Create the environment (same for all platforms):
 
 ```bash
 python3 -m venv venv
-# macOS/Linux
+```
+
+Then activate it:
+
+<details>
+<summary><strong>macOS / Linux</strong></summary>
+
+```bash
 source venv/bin/activate
-# Windows PowerShell
+```
+
+</details>
+
+<details>
+<summary><strong>Windows (PowerShell)</strong></summary>
+
+```powershell
 .\venv\Scripts\Activate.ps1
 ```
+
+</details>
+
 
 ### 3. Install dependencies
 
