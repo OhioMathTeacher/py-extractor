@@ -121,7 +121,7 @@ def extract_positionality(pdf_path):
         "first_person_reflexivity": re.compile(r"\bI (?:identify|situate|position)\b", re.IGNORECASE),
         "researcher_self": re.compile(r"\bI.*?\bresearcher\b", re.IGNORECASE),
         "author_self": re.compile(r"\bI.*?\bauthor\b", re.IGNORECASE),
-        "as_a_role": re.compile(r"\bAs a [A-Z][a-z]+(?: [A-Z][a-z]+)*\b", re.IGNORECASE),
+        "as_a_role": re.compile(r"\bAs a [A-Z][a-z]+(?: [A-Z][a-z]+)*,\s*I\b", re.IGNORECASE),
     }
     matched = []
     snippets = {}
