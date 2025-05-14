@@ -3,6 +3,8 @@ import re
 import pdfplumber
 import requests
 from PyPDF2 import PdfReader
+# Stub for GPT fallback (requires openai setup)
+import openai
 
 
 def extract_metadata_pymupdf(pdf_path):
@@ -20,143 +22,185 @@ def extract_metadata_pymupdf(pdf_path):
             "subject": raw.get("subject"),
             "keywords": raw.get("keywords"),
             "creation_date": raw.get("creationDate"),
-            "producer": raw.get("producer")
+            "producer": raw.get("producer"),
         })
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"PyMuPDF metadata extraction failed for {pdf_path}: {e}")
     return meta
 
 
-def extract_metadata_pypdf2(pdf_path):
+def extract_metadata_pdfplumber(pdf_path):
     """
-    Extract metadata with PyPDF2: title, author, subject, keywords.
+    Extract text-based metadata using pdfplumber by scanning the first two pages.
+    Returns dict: title, author, journal, volume, issue, pages, doi.
     """
-    meta = {"title": None, "author": None, "subject": None, "keywords": None}
+    meta = {"title": None, "author": None, "journal": None, "volume": None, "issue": None, "pages": None, "doi": None}
     try:
-        reader = PdfReader(pdf_path)
-        info = reader.metadata
-        meta.update({
-            "title": getattr(info, 'title', None),
-            "author": getattr(info, 'author', None),
-            "subject": getattr(info, 'subject', None),
-            "keywords": getattr(info, 'keywords', None)
-        })
-    except Exception:
-        pass
+        with pdfplumber.open(pdf_path) as pdf:
+            text = ""
+            for page in pdf.pages[:2]:
+                text += page.extract_text() or ""
+            title_match = re.search(r"^Title:\s*(.*)$", text, re.MULTILINE)
+            if title_match:
+                meta["title"] = title_match.group(1).strip()
+            author_match = re.search(r"^Author[s]?:\s*(.*)$", text, re.MULTILINE)
+            if author_match:
+                meta["author"] = author_match.group(1).strip()
+            doi_match = re.search(r"doi:\s*(10\.\d{4,9}/[-._;()/:A-Z0-9]+)", text, re.IGNORECASE)
+            if doi_match:
+                meta["doi"] = doi_match.group(1)
+    except Exception as e:
+        print(f"PdfPlumber metadata extraction failed for {pdf_path}: {e}")
     return meta
-
-
-def scrape_header_footer(pdf_path):
-    """
-    Scan first 3 and last 3 pages for "Journal, Vol X, Issue Y" pattern.
-    """
-    pattern = re.compile(
-        r"(?P<journal>[A-Za-z &\-:]+),?\s*Vol(?:ume)?\.?\s*(?P<volume>\d+),?\s*Iss(?:ue)?\.?\s*(?P<issue>\d+)",
-        re.IGNORECASE
-    )
-    journal = volume = issue = None
-    with pdfplumber.open(pdf_path) as pdf:
-        pages = pdf.pages[:3] + pdf.pages[-3:]
-        for page in pages:
-            text = page.extract_text() or ""
-            m = pattern.search(text)
-            if m:
-                journal = m.group("journal").strip()
-                volume  = m.group("volume")
-                issue   = m.group("issue")
-                break
-    return {"journal": journal, "volume": volume, "issue": issue}
 
 
 def extract_doi(pdf_path):
     """
-    Extract DOI from first 3 pages via regex.
-    """
-    doi = None
-    with pdfplumber.open(pdf_path) as pdf:
-        for page in pdf.pages[:3]:
-            text = page.extract_text() or ""
-            m = re.search(r"10\.\d{4,9}/[^\s]+", text)
-            if m:
-                doi = m.group(0)
-                break
-    return doi
-
-
-def crossref_lookup(doi):
-    """
-    Query Crossref for metadata given a DOI.
+    Try extracting DOI by scanning text of first two pages.
     """
     try:
-        headers = {"User-Agent": "SearchBuddy/1.0 (mailto:todd@miamioh.edu)"}
-        resp = requests.get(f"https://api.crossref.org/works/{doi}", headers=headers, timeout=10)
-        msg = resp.json().get("message", {})
+        reader = PdfReader(pdf_path)
+        text = "".join(page.extract_text() or "" for page in reader.pages[:2])
+        match = re.search(r"10\.\d{4,9}/[-._;()/:A-Z0-9]+", text, re.IGNORECASE)
+        if match:
+            return match.group(0)
+    except Exception as e:
+        print(f"PyPDF2 DOI extraction failed for {pdf_path}: {e}")
+    return None
+
+
+def crossref_lookup(doi_or_title):
+    """
+    Lookup metadata from Crossref using DOI or title.
+    Returns dict: journal, volume, issue, author, title.
+    """
+    headers = {"User-Agent": "py-extractor/0.3 (mailto:youremail@example.com)"}
+    url = (f"https://api.crossref.org/works/{doi_or_title}" if doi_or_title.startswith("10.") else
+           "https://api.crossref.org/works?query.title=" + requests.utils.quote(doi_or_title))
+    try:
+        resp = requests.get(url, headers=headers, timeout=10)
+        data = resp.json()
+        item = (data["message"]["items"][0] if not doi_or_title.startswith("10.") else data["message"])
         return {
-            "journal": msg.get("container-title", [None])[0],
-            "volume": msg.get("volume"),
-            "issue": msg.get("issue"),
-            "author": "; ".join([a.get("family","") for a in msg.get("author",[])])
+            "journal": item.get("container-title", [None])[0],
+            "volume": item.get("volume"),
+            "issue": item.get("issue"),
+            "author": ", ".join([f"{a.get('given')} {a.get('family')}" for a in item.get("author", [])]) if item.get("author") else None,
+            "title": item.get("title", [None])[0],
         }
-    except Exception:
+    except Exception as e:
+        print(f"Crossref lookup failed for {doi_or_title}: {e}")
         return {}
 
 
-def crossref_lookup_by_title(title):
+def extract_positionality(pdf_path):
     """
-    Query Crossref’s bibliographic endpoint for the given title.
-    Returns dict with keys journal, volume, issue, author.
+    Multi-strategy positionality detection:
+     - Regex patterns
+     - Header-based extraction
+     - GPT fallback (stub)
+    Returns dict: matched_tests, snippets, score.
     """
-    result = {}
+    # Load pages as text for scan
+    with pdfplumber.open(pdf_path) as pdf:
+        # Determine end region (before references)
+        ref_page = None
+        for i, pg in enumerate(pdf.pages):
+            if re.search(r"^\s*References\s*$", pg.extract_text() or "", re.IGNORECASE | re.MULTILINE):
+                ref_page = i
+                break
+        start = ref_page - 2 if ref_page and ref_page >= 2 else max(len(pdf.pages) - 2, 0)
+        end = ref_page if ref_page else len(pdf.pages)
+        pos_text = "\n".join(pdf.pages[start:end][j].extract_text() or "" for j in range(len(pdf.pages[start:end])))
+        # For header-based, scan entire doc
+        full_text = "\n".join(page.extract_text() or "" for page in pdf.pages)
+
+    # Define tests
+    tests = {
+        "explicit_positionality": re.compile(r"\b(?:My|Our) positionality\b", re.IGNORECASE),
+        "first_person_reflexivity": re.compile(r"\bI (?:identify|situate|position)\b", re.IGNORECASE),
+        "researcher_self": re.compile(r"\bI.*?\bresearcher\b", re.IGNORECASE),
+        "author_self": re.compile(r"\bI.*?\bauthor\b", re.IGNORECASE),
+        "as_a_role": re.compile(r"\bAs a [A-Z][a-z]+(?: [A-Z][a-z]+)*\b", re.IGNORECASE),
+    }
+    matched = []
+    snippets = {}
+    # Run regex tests
+    for name, pattern in tests.items():
+        m = pattern.search(pos_text)
+        if m:
+            matched.append(name)
+            snippets[name] = m.group(0).strip()
+    # Header-based test
+    header_snip = None
+    for hdr in ("Positionality", "Reflexivity", "Researcher Background"):
+        hdr_pat = re.compile(rf"^\s*{hdr}\b", re.IGNORECASE | re.MULTILINE)
+        if hdr_pat.search(full_text):
+            # take paragraph after header
+            parts = full_text.splitlines()
+            for idx, line in enumerate(parts):
+                if hdr_pat.match(line):
+                    # next non-empty line
+                    for nxt in parts[idx+1:]:
+                        if nxt.strip():
+                            header_snip = nxt.strip()
+                            matched.append("header")
+                            snippets["header"] = header_snip
+                            break
+                    break
+            if header_snip:
+                break
+    # GPT fallback stub
+    gpt_snip = None
     try:
-        if not title:
-            return result
-        from urllib.parse import quote_plus
-        q = quote_plus(title)
-        url = f"https://api.crossref.org/works?query.bibliographic={q}&rows=1"
-        headers = {"User-Agent": "SearchBuddy/1.0 (mailto:todd@miamioh.edu)"}
-        resp = requests.get(url, headers=headers, timeout=10)
-        resp.raise_for_status()
-        items = resp.json().get("message", {}).get("items", [])
-        if not items:
-            return result
-        msg = items[0]
-        result["journal"] = msg.get("container-title", [None])[0]
-        result["volume"]  = msg.get("volume")
-        result["issue"]   = msg.get("issue")
-        authors = msg.get("author", [])
-        result["author"] = "; ".join([f"{a.get('given','')} {a.get('family','')}".strip() for a in authors])
+        # Place your prompt + call here; stub returns None
+        # response = openai.ChatCompletion.create(...)
+        # gpt_snip = response.choices[0].message.content.strip()
+        pass
     except Exception:
         pass
-    return result
+    if gpt_snip:
+        matched.append("gpt_fallback")
+        snippets["gpt_fallback"] = gpt_snip
+
+    score = len(matched) / (len(tests) + 2)  # regex tests + header + GPT
+    return {"matched_tests": matched, "snippets": snippets, "score": score}
 
 
 def extract_metadata(pdf_path):
     """
-    Master metadata extractor: embedded -> PyPDF2 -> header/footer -> DOI -> title-search.
-    Returns merged metadata dict.
+    Master function to extract metadata and positionality scoring.
+    Returns dict with standard metadata + positionality map.
     """
-    meta = extract_metadata_pymupdf(pdf_path)
-    if not meta.get("title") or not meta.get("author"):
-        fallback = extract_metadata_pypdf2(pdf_path)
-        for k, v in fallback.items():
-            if not meta.get(k) and v:
-                meta[k] = v
-    if not meta.get("journal") or not meta.get("volume"):
-        hdr = scrape_header_footer(pdf_path)
-        for k in ("journal", "volume", "issue"):
-            if not meta.get(k) and hdr.get(k):
-                meta[k] = hdr[k]
-    if not meta.get("journal") or not meta.get("volume") or not meta.get("author"):
+    meta = {}
+    # Embedded PDF metadata
+    meta.update(extract_metadata_pymupdf(pdf_path))
+    # Text parsing from first two pages
+    text_meta = extract_metadata_pdfplumber(pdf_path)
+    meta.update(text_meta)
+    # Sanitize DOI
+    if meta.get("doi"):
+        meta["doi"] = meta["doi"].strip().rstrip('.;,')
+    # DOI fallback
+    if not meta.get("doi"):
         doi = extract_doi(pdf_path)
         if doi:
-            cr = crossref_lookup(doi)
-            for k, v in cr.items():
-                if not meta.get(k) and v:
-                    meta[k] = v
-    # Title-search fallback
-    if not meta.get("journal") or not meta.get("volume") or not meta.get("author"):
-        title_cr = crossref_lookup_by_title(meta.get("title", ""))
+            meta["doi"] = doi.strip().rstrip('.;,')
+    # Crossref by DOI
+    if meta.get("doi"):
+        cr = crossref_lookup(meta["doi"])
+        for k, v in cr.items():
+            if not meta.get(k) and v:
+                meta[k] = v
+    # Crossref by title
+    if (not meta.get("journal") or not meta.get("volume") or not meta.get("author")) and meta.get("title"):
+        cr2 = crossref_lookup(text_meta.get("title", ""))
         for k in ("journal", "volume", "issue", "author"):
-            if not meta.get(k) and title_cr.get(k):
-                meta[k] = title_cr[k]
+            if not meta.get(k) and cr2.get(k):
+                meta[k] = cr2[k]
+    # Positionality detection & scoring
+    pos = extract_positionality(pdf_path)
+    meta["positionality_tests"] = pos.get("matched_tests")
+    meta["positionality_snippets"] = pos.get("snippets")
+    meta["positionality_score"] = pos.get("score")
     return meta
