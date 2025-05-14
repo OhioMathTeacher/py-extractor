@@ -112,20 +112,18 @@ def extract_positionality(pdf_path):
         start = ref_page - 2 if ref_page and ref_page >= 2 else max(len(pdf.pages) - 2, 0)
         end = ref_page if ref_page else len(pdf.pages)
         pos_text = "\n".join(pdf.pages[start:end][j].extract_text() or "" for j in range(len(pdf.pages[start:end])))
-        # For header-based, scan entire doc
         full_text = "\n".join(page.extract_text() or "" for page in pdf.pages)
 
-    # Define tests
+    # Define refined tests
     tests = {
         "explicit_positionality": re.compile(r"\b(?:My|Our) positionality\b", re.IGNORECASE),
-        "first_person_reflexivity": re.compile(r"\bI (?:identify|situate|position|reflect|acknowledge)\b", re.IGNORECASE),
-        "researcher_self": re.compile(r"\bI,?\s*as a researcher\b", re.IGNORECASE),
-        "author_self": re.compile(r"\bI.*?\bauthor\b", re.IGNORECASE),
+        "first_person_reflexivity": re.compile(r"\bI\s+(?:reflect|acknowledge|consider|recognize)\b", re.IGNORECASE),
+        "researcher_self": re.compile(r"\bI,?\s*as a researcher,", re.IGNORECASE),
+        "author_self": re.compile(r"\bI,?\s*as (?:the )?author,", re.IGNORECASE),
         "as_a_role": re.compile(r"\bAs a [A-Z][a-z]+(?: [A-Z][a-z]+)*,\s*I\b", re.IGNORECASE),
     }
     matched = []
     snippets = {}
-    # Run regex tests
     for name, pattern in tests.items():
         m = pattern.search(pos_text)
         if m:
@@ -148,53 +146,32 @@ def extract_positionality(pdf_path):
                     break
             if header_snip:
                 break
-    # GPT fallback stub
     gpt_snip = None
-    try:
-        # Place your prompt + call here; stub returns None
-        pass
-    except Exception:
-        pass
     if gpt_snip:
         matched.append("gpt_fallback")
         snippets["gpt_fallback"] = gpt_snip
 
-    score = len(matched) / (len(tests) + 2)  # regex tests + header + GPT
+    score = len(matched) / (len(tests) + 2)
     return {"matched_tests": matched, "snippets": snippets, "score": score}
 
 
 def extract_metadata(pdf_path):
-    """
-    Master function to extract metadata and positionality scoring.
-    Returns dict with standard metadata + positionality map.
-    """
     meta = {}
-    # Embedded PDF metadata
     meta.update(extract_metadata_pymupdf(pdf_path))
-    # Text parsing from first two pages
     text_meta = extract_metadata_pdfplumber(pdf_path)
     meta.update(text_meta)
-    # Sanitize DOI
-    if meta.get("doi"):
-        meta["doi"] = meta["doi"].strip().rstrip('.;,')
-    # DOI fallback
+    if meta.get("doi"): meta["doi"] = meta["doi"].strip().rstrip('.;,')
     if not meta.get("doi"):
         doi = extract_doi(pdf_path)
-        if doi:
-            meta["doi"] = doi.strip().rstrip('.;,')
-    # Crossref by DOI
+        if doi: meta["doi"] = doi.strip().rstrip('.;,')
     if meta.get("doi"):
         cr = crossref_lookup(meta["doi"])
         for k, v in cr.items():
-            if not meta.get(k) and v:
-                meta[k] = v
-    # Crossref by title
+            if not meta.get(k) and v: meta[k] = v
     if (not meta.get("journal") or not meta.get("volume") or not meta.get("author")) and meta.get("title"):
         cr2 = crossref_lookup(text_meta.get("title", ""))
         for k in ("journal", "volume", "issue", "author"):
-            if not meta.get(k) and cr2.get(k):
-                meta[k] = cr2[k]
-    # Positionality detection & scoring
+            if not meta.get(k) and cr2.get(k): meta[k] = cr2[k]
     pos = extract_positionality(pdf_path)
     meta["positionality_tests"] = pos.get("matched_tests")
     meta["positionality_snippets"] = pos.get("snippets")
