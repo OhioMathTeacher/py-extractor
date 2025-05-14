@@ -176,7 +176,7 @@ def extract_positionality(pdf_path):
     if score_partial < 0.2:
         try:
             prompt = f"Extract the author's positionality or reflexivity statement from the text below. If none exists, reply 'NONE':\n\n{pos_text}"  # noqa
-            resp = openai.ChatCompletion.create(
+            resp = openai.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.0,
