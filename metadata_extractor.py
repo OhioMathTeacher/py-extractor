@@ -98,11 +98,33 @@ def crossref_lookup(doi_or_title):
     return {}
 
 
-def crossref_lookup_by_title(title):
+def datacite_lookup(doi):
     """
-    Convenience wrapper to search Crossref by title.
+    Lookup metadata from DataCite using DOI.
+    Returns dict: journal, volume, issue, author, title.
     """
-    return crossref_lookup(title)
+    url = f"https://api.datacite.org/works/{doi}"
+    try:
+        resp = requests.get(url, timeout=10)
+        if resp.status_code != 200:
+            print(f"DataCite lookup returned status {resp.status_code} for {doi}")
+            return {}
+        data = resp.json()
+        attrs = data.get("data", {}).get("attributes", {})
+        creators = attrs.get("creator", [])
+        author_list = [f"{c.get('givenName', '')} {c.get('familyName', '')}".strip() for c in creators]
+        return {
+            "journal": attrs.get("container-title"),
+            "volume": attrs.get("volume"),
+            "issue": attrs.get("issue"),
+            "author": ", ".join(author_list) if author_list else None,
+            "title": attrs.get("title"),
+        }
+    except requests.RequestException as e:
+        print(f"DataCite lookup network error for {doi}: {e}")
+    except ValueError:
+        print(f"DataCite lookup returned invalid JSON for {doi}")
+    return {}
 
 
 def extract_positionality(pdf_path):
@@ -111,7 +133,6 @@ def extract_positionality(pdf_path):
     Returns dict: matched_tests, snippets, score.
     """
     with pdfplumber.open(pdf_path) as pdf:
-        # Determine region before References
         ref_page = None
         for i, pg in enumerate(pdf.pages):
             if re.search(r"^\s*References\s*$", pg.extract_text() or "", re.IGNORECASE | re.MULTILINE):
@@ -122,7 +143,6 @@ def extract_positionality(pdf_path):
         pos_text = "\n".join(pdf.pages[start:end][j].extract_text() or "" for j in range(len(pdf.pages[start:end])))
         full_text = "\n".join(page.extract_text() or "" for page in pdf.pages)
 
-    # Regex pattern tests
     tests = {
         "explicit_positionality": re.compile(r"\b(?:My|Our) positionality\b", re.IGNORECASE),
         "first_person_reflexivity": re.compile(r"\bI\s+(?:reflect|acknowledge|consider|recognize)\b", re.IGNORECASE),
@@ -138,7 +158,6 @@ def extract_positionality(pdf_path):
             matched.append(name)
             snippets[name] = m.group(0).strip()
 
-    # Header-based test
     header_snip = None
     for hdr in ("Positionality", "Reflexivity", "Researcher Background"):
         hdr_pat = re.compile(rf"^\s*{hdr}\b", re.IGNORECASE | re.MULTILINE)
@@ -156,11 +175,6 @@ def extract_positionality(pdf_path):
             if header_snip:
                 break
 
-    # GPT fallback stub (not yet implemented)
-    # if gpt_snip:
-    #     matched.append("gpt_fallback")
-    #     snippets["gpt_fallback"] = gpt_snip
-
     score = len(matched) / (len(tests) + 2)
     return {"matched_tests": matched, "snippets": snippets, "score": score}
 
@@ -171,16 +185,12 @@ def extract_metadata(pdf_path):
     Returns dict including positionality_confidence.
     """
     meta = {}
-    # Embedded metadata
     meta.update(extract_metadata_pymupdf(pdf_path))
-    # Text-based metadata
     text_meta = extract_metadata_pdfplumber(pdf_path)
     meta.update(text_meta)
 
-    # Sanitize DOI
     if meta.get("doi"):
         meta["doi"] = meta["doi"].strip().rstrip('.;,')
-    # DOI fallback
     if not meta.get("doi"):
         doi = extract_doi(pdf_path)
         if doi:
@@ -189,24 +199,25 @@ def extract_metadata(pdf_path):
     # Crossref lookup
     if meta.get("doi"):
         cr = crossref_lookup(meta["doi"])
+        if not cr:
+            # fallback to DataCite if Crossref misses
+            dc = datacite_lookup(meta["doi"])
+            cr = dc
         for k, v in cr.items():
             if not meta.get(k) and v:
                 meta[k] = v
 
-    # Additional Crossref by title if needed
     if (not meta.get("journal") or not meta.get("volume") or not meta.get("author")) and meta.get("title"):
         cr2 = crossref_lookup(text_meta.get("title", ""))
         for k in ("journal", "volume", "issue", "author"):
             if not meta.get(k) and cr2.get(k):
                 meta[k] = cr2[k]
 
-    # Positionality detection
     pos = extract_positionality(pdf_path)
     meta["positionality_tests"] = pos.get("matched_tests")
     meta["positionality_snippets"] = pos.get("snippets")
     meta["positionality_score"] = pos.get("score")
 
-    # Bucket confidence
     score = meta.get("positionality_score", 0)
     if score >= 0.75:
         confidence = "high"
