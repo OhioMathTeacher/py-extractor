@@ -4,7 +4,6 @@ import re
 import pdfplumber
 import requests
 from PyPDF2 import PdfReader
-# Stub for GPT fallback (requires openai setup)
 import openai
 
 
@@ -32,22 +31,19 @@ def extract_metadata_pymupdf(pdf_path):
 
 def extract_metadata_pdfplumber(pdf_path):
     """
-    Extract text-based metadata by scanning the first two pages with pdfplumber.
+    Extract text-based metadata using pdfplumber by scanning the first two pages.
     Returns dict: title, author, journal, volume, issue, pages, doi.
     """
     meta = {"title": None, "author": None, "journal": None, "volume": None, "issue": None, "pages": None, "doi": None}
     try:
         with pdfplumber.open(pdf_path) as pdf:
             text = "".join(page.extract_text() or "" for page in pdf.pages[:2])
-        title_match = re.search(r"^Title:\s*(.*)$", text, re.MULTILINE)
-        if title_match:
-            meta["title"] = title_match.group(1).strip()
-        author_match = re.search(r"^Author[s]?:\s*(.*)$", text, re.MULTILINE)
-        if author_match:
-            meta["author"] = author_match.group(1).strip()
-        doi_match = re.search(r"doi:\s*(10\.\d{4,9}/[-._;()/:A-Z0-9]+)", text, re.IGNORECASE)
-        if doi_match:
-            meta["doi"] = doi_match.group(1)
+        match = re.search(r"^Title:\s*(.*)$", text, re.MULTILINE)
+        if match: meta["title"] = match.group(1).strip()
+        match = re.search(r"^Author[s]?:\s*(.*)$", text, re.MULTILINE)
+        if match: meta["author"] = match.group(1).strip()
+        match = re.search(r"doi:\s*(10\.\d{4,9}/[-._;()/:A-Z0-9]+)", text, re.IGNORECASE)
+        if match: meta["doi"] = match.group(1)
     except Exception as e:
         print(f"PdfPlumber metadata extraction failed for {pdf_path}: {e}")
     return meta
@@ -61,8 +57,7 @@ def extract_doi(pdf_path):
         reader = PdfReader(pdf_path)
         text = "".join(page.extract_text() or "" for page in reader.pages[:2])
         match = re.search(r"10\.\d{4,9}/[-._;()/:A-Z0-9]+", text, re.IGNORECASE)
-        if match:
-            return match.group(0)
+        if match: return match.group(0)
     except Exception as e:
         print(f"PyPDF2 DOI extraction failed for {pdf_path}: {e}")
     return None
@@ -130,22 +125,23 @@ def datacite_lookup(doi):
 
 def extract_positionality(pdf_path):
     """
-    Multi-strategy positionality detection with scoring.
+    Multi-strategy positionality detection with GPT fallback and scoring.
     Returns dict: matched_tests, snippets, score.
     """
     with pdfplumber.open(pdf_path) as pdf:
-        # determine pages before References
+        # Determine region before References
         ref_page = None
-        for i, page in enumerate(pdf.pages):
-            text = page.extract_text() or ""
-            if re.search(r"^\s*References\s*$", text, re.IGNORECASE | re.MULTILINE):
+        for i, pg in enumerate(pdf.pages):
+            text_pg = pg.extract_text() or ""
+            if re.search(r"^\s*References\s*$", text_pg, re.IGNORECASE | re.MULTILINE):
                 ref_page = i
                 break
-        start = ref_page - 2 if ref_page and ref_page >= 2 else max(len(pdf.pages)-2, 0)
-        end = ref_page if ref_page else len(pdf.pages)
+        start = ref_page - 2 if ref_page and ref_page >= 2 else max(len(pdf.pages) - 2, 0)
+        end = ref_page or len(pdf.pages)
         pos_text = "\n".join(pdf.pages[j].extract_text() or "" for j in range(start, end))
-        full_text = "\n".join(page.extract_text() or "" for page in pdf.pages)
+        full_text = "\n".join(p.extract_text() or "" for p in pdf.pages)
 
+    # Regex tests
     tests = {
         "explicit_positionality": re.compile(r"\b(?:My|Our) positionality\b", re.IGNORECASE),
         "first_person_reflexivity": re.compile(r"\bI\s+(?:reflect|acknowledge|consider|recognize)\b", re.IGNORECASE),
@@ -153,15 +149,14 @@ def extract_positionality(pdf_path):
         "author_self": re.compile(r"\bI,?\s*as (?:the )?author,", re.IGNORECASE),
         "as_a_role": re.compile(r"\bAs a [A-Z][a-z]+(?: [A-Z][a-z]+)*,\s*I\b", re.IGNORECASE),
     }
-    matched = []
-    snippets = {}
-    for name, pattern in tests.items():
-        m = pattern.search(pos_text)
+    matched, snippets = [], {}
+    for name, pat in tests.items():
+        m = pat.search(pos_text)
         if m:
             matched.append(name)
             snippets[name] = m.group(0).strip()
 
-    # header-based test
+    # Header-based
     for hdr in ("Positionality", "Reflexivity", "Researcher Background"):
         pat = re.compile(rf"^\s*{hdr}\b", re.IGNORECASE | re.MULTILINE)
         if pat.search(full_text):
@@ -176,59 +171,63 @@ def extract_positionality(pdf_path):
                     break
             break
 
-    # GPT fallback stub (not yet implemented)
-    score = len(matched) / (len(tests) + 2)
+    # GPT fallback for low-confidence
+    score_partial = len(matched) / (len(tests) + 1)  # +1 for header test only
+    if score_partial < 0.2:
+        try:
+            prompt = f"Extract the author's positionality or reflexivity statement from the text below. If none exists, reply 'NONE':\n\n{pos_text}"  # noqa
+            resp = openai.ChatCompletion.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.0,
+            )
+            gpt_snip = resp.choices[0].message.content.strip()
+            if gpt_snip and gpt_snip.upper() != "NONE":
+                matched.append("gpt_fallback")
+                snippets["gpt_fallback"] = gpt_snip
+        except Exception as e:
+            print(f"GPT fallback error: {e}")
+
+    score = len(matched) / (len(tests) + 2)  # regex, header, GPT
     return {"matched_tests": matched, "snippets": snippets, "score": score}
 
 
 def extract_metadata(pdf_path):
-    """
-    Combine metadata extraction and positionality scoring.
-    Returns dict including positionality_confidence and filename fallback.
-    """
     meta = {}
     meta.update(extract_metadata_pymupdf(pdf_path))
     text_meta = extract_metadata_pdfplumber(pdf_path)
     meta.update(text_meta)
 
-    # sanitize and fallback DOI
     if meta.get("doi"): meta["doi"] = meta["doi"].strip().rstrip('.;,')
     if not meta.get("doi"):
         doi = extract_doi(pdf_path)
         if doi: meta["doi"] = doi.strip().rstrip('.;,')
 
-    # Crossref + DataCite lookup
     if meta.get("doi"):
-        cr = crossref_lookup(meta["doi"])
-        if not cr: cr = datacite_lookup(meta["doi"])
+        cr = crossref_lookup(meta["doi"]) or datacite_lookup(meta["doi"])
         for k, v in cr.items():
             if not meta.get(k) and v: meta[k] = v
 
-    # title-based Crossref fallback
     title_for_lookup = text_meta.get("title")
     if title_for_lookup:
         cr2 = crossref_lookup(title_for_lookup)
         for k in ("journal","volume","issue","author"):
             if not meta.get(k) and cr2.get(k): meta[k] = cr2[k]
 
-    # filename-based author fallback
     if not meta.get("author"):
         base = os.path.basename(pdf_path)
-        name = os.path.splitext(base)[0]
-        m = re.match(r"^([A-Za-z]+)(?:-et-al)?(?:-\d{4}.*)?$", name)
+        nm = os.path.splitext(base)[0]
+        m = re.match(r"^([A-Za-z]+)(?:-et-al)?(?:-\d{4}.*)?$", nm)
         if m:
             lead = m.group(1).replace("-"," ").title()
-            auth = f"{lead} et al." if "-et-al" in name else lead
+            auth = f"{lead} et al." if "-et-al" in nm else lead
             meta["author"] = auth
             meta["author_from_filename"] = auth
 
-    # positionality scoring
     pos = extract_positionality(pdf_path)
     meta["positionality_tests"] = pos.get("matched_tests")
     meta["positionality_snippets"] = pos.get("snippets")
     meta["positionality_score"] = pos.get("score")
-    # confidence bucket
     sc = meta.get("positionality_score",0)
-    meta["positionality_confidence"] = ("high" if sc>=0.75 else "medium" if sc>=0.2 else "low")
-
+    meta["positionality_confidence"] = "high" if sc>=0.75 else "medium" if sc>=0.2 else "low"
     return meta
