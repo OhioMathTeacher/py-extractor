@@ -122,14 +122,16 @@ def datacite_lookup(doi):
         print(f"DataCite lookup returned invalid JSON for {doi}")
     return {}
 
-
 def extract_positionality(pdf_path):
     """
     Multi-strategy positionality detection with GPT fallback and scoring.
     Returns dict: matched_tests, snippets, score.
     """
+    # compile footer matcher to stop at page‐footer lines
+    footer_re = re.compile(r"^HSR\s+\d+", re.IGNORECASE)
+
+    # grab the 1–2 pages before the References section
     with pdfplumber.open(pdf_path) as pdf:
-        # Determine region before References
         ref_page = None
         for i, pg in enumerate(pdf.pages):
             text_pg = pg.extract_text() or ""
@@ -137,17 +139,19 @@ def extract_positionality(pdf_path):
                 ref_page = i
                 break
         start = ref_page - 2 if ref_page and ref_page >= 2 else max(len(pdf.pages) - 2, 0)
-        end = ref_page or len(pdf.pages)
-        pos_text = "\n".join(pdf.pages[j].extract_text() or "" for j in range(start, end))
-        full_text = "\n".join(p.extract_text() or "" for p in pdf.pages)
+        end   = ref_page or len(pdf.pages)
+        pos_text = "\n".join(
+            pdf.pages[j].extract_text() or ""
+            for j in range(start, end)
+        )
 
-    # Regex tests
+    # 1) Regex‐based quick tests
     tests = {
-        "explicit_positionality": re.compile(r"\b(?:My|Our) positionality\b", re.IGNORECASE),
-        "first_person_reflexivity": re.compile(r"\bI\s+(?:reflect|acknowledge|consider|recognize)\b", re.IGNORECASE),
-        "researcher_self": re.compile(r"\bI,?\s*as a researcher,", re.IGNORECASE),
-        "author_self": re.compile(r"\bI,?\s*as (?:the )?author,", re.IGNORECASE),
-        "as_a_role": re.compile(r"\bAs a [A-Z][a-z]+(?: [A-Z][a-z]+)*,\s*I\b", re.IGNORECASE),
+        "explicit_positionality":    re.compile(r"\b(?:My|Our) positionality\b", re.IGNORECASE),
+        "first_person_reflexivity":  re.compile(r"\bI\s+(?:reflect|acknowledge|consider|recognize)\b", re.IGNORECASE),
+        "researcher_self":           re.compile(r"\bI,?\s*as a researcher,", re.IGNORECASE),
+        "author_self":               re.compile(r"\bI,?\s*as (?:the )?author,", re.IGNORECASE),
+        "as_a_role":                 re.compile(r"\bAs a [A-Z][a-z]+(?: [A-Z][a-z]+)*,\s*I\b", re.IGNORECASE),
     }
     matched, snippets = [], {}
     for name, pat in tests.items():
@@ -156,41 +160,61 @@ def extract_positionality(pdf_path):
             matched.append(name)
             snippets[name] = m.group(0).strip()
 
-    # Header-based
+    # 2) Header‐based extraction, confined to pos_text, capped by lines & chars
+    lines = pos_text.splitlines()
+    MAX_LINES = 10
+    MAX_CHARS = 500
     for hdr in ("Positionality", "Reflexivity", "Researcher Background"):
         pat = re.compile(rf"^\s*{hdr}\b", re.IGNORECASE | re.MULTILINE)
-        if pat.search(full_text):
-            lines = full_text.splitlines()
+        if pat.search(pos_text):
+            paragraph = []
             for idx, line in enumerate(lines):
                 if pat.match(line):
+                    # collect subsequent non-blank, non-footer lines
                     for nxt in lines[idx+1:]:
-                        if nxt.strip():
-                            matched.append("header")
-                            snippets["header"] = nxt.strip()
+                        if not nxt.strip() or footer_re.match(nxt):
+                            break
+                        paragraph.append(nxt.strip())
+                        if len(paragraph) >= MAX_LINES:
                             break
                     break
+            snippet = " ".join(paragraph)
+            if len(snippet) > MAX_CHARS:
+                # truncate to last full word under char cap
+                snippet = snippet[:MAX_CHARS].rsplit(" ", 1)[0] + "…"
+            if snippet:
+                matched.append("header")
+                snippets["header"] = snippet
             break
 
-    # GPT fallback for low-confidence
-    score_partial = len(matched) / (len(tests) + 1)  # +1 for header test only
-    if score_partial < 0.2:
+    # 3) GPT fallback for low-confidence cases
+    score_partial = len(matched) / (len(tests) + 1)  # regex + header
+    api_key = getattr(openai, "api_key", None) or os.getenv("OPENAI_API_KEY")
+    if score_partial < 0.2 and api_key:
+        openai.api_key = api_key
         try:
-            prompt = f"Extract the author's positionality or reflexivity statement from the text below. If none exists, reply 'NONE':\n\n{pos_text}"  # noqa
+            prompt = (
+                "Extract the author's positionality or reflexivity statement "
+                "from the text below. If none exists, reply 'NONE':\n\n"
+                + pos_text
+            )
             resp = openai.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.0,
             )
             gpt_snip = resp.choices[0].message.content.strip()
-            if gpt_snip and gpt_snip.upper() != "NONE":
+            if gpt_snip.upper() != "NONE":
                 matched.append("gpt_fallback")
                 snippets["gpt_fallback"] = gpt_snip
         except Exception as e:
             print(f"GPT fallback error: {e}")
+    elif score_partial < 0.2:
+        print("Skipping GPT fallback: OPENAI_API_KEY not set")
 
-    score = len(matched) / (len(tests) + 2)  # regex, header, GPT
+    # Final positionality confidence score (includes GPT)
+    score = len(matched) / (len(tests) + 2)
     return {"matched_tests": matched, "snippets": snippets, "score": score}
-
 
 def extract_metadata(pdf_path):
     meta = {}
