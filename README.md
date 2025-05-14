@@ -154,6 +154,30 @@ python py_extractor02v2.py --help
 
 ---
 
+## 🧹 Known Issues & Planned Refactors
+
+This project evolved quickly and collaboratively—so there are a few inconsistencies:
+
+### File Naming
+- Some files use underscores (`gui_openai_05_13_25v2.py`), others use dashes (`dean-2021-reflexivity.pdf`)
+- CLI tools and GUI scripts don’t follow the same versioning convention
+
+### Directory Structure
+- Some scripts are in `/cli/`, others in root, tests are still in root
+- Future versions will consolidate scripts into clearly named subfolders:
+  - `/gui/`
+  - `/cli/`
+  - `/tests/`
+
+### UX & Codebase Notes
+- GUI lacks a proper `File > Preferences` dialog
+- `metadata_extractor.py` is doing a lot—may need refactoring into smaller utilities
+- `test_extractor.py` is a placeholder—more structured testing needed
+
+These issues are known and on the roadmap (see version plans below). Contributions welcome—especially if you want to help clean house!
+
+---
+
 ## 🧪 License
 
 Licensed under **CC BY-NC 4.0**  
