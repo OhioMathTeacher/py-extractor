@@ -116,6 +116,7 @@ python py_extractor02v2.py --help
 ## 🔭 Planned Features
 
 - Save/load settings between sessions
+- Access PDFs remotely (e.g., from Google Drive or Dropbox)
 - Drag-and-drop file interface
 - Inline preview of extracted content
 - Improved AI prompt targeting for positionality
