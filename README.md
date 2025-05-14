@@ -6,11 +6,10 @@ Originally built for large-scale qualitative research in educational scholarship
 
 - 🧑‍🏫 Positionality statement detection  
 - 📄 Metadata & DOI extraction  
-- 📤 CSV export with live debug tracking
+- 📄 CSV export with live debug tracking
 
-> 🚀 **[Latest Release: v0.3.5](https://github.com/Technology-Educators-Alliance/py-extractor/releases/latest)** — with improved debug output and one-click CSV download.
-
-> ⚠️ **Known Issue:** This version still needs work on the search routines. For example, the positionality statement in `dean-2017-identity-negotiation.pdf` is not currently being detected by v0.3.5.
+> 🚀 **Latest Release: v0.3.6** — persistent API key, improved prompt UX, and smarter CSV behavior  
+> 🔬 **Note:** Positionality detection is improving, but not all PDFs yield matches yet.
 
 ---
 
@@ -18,14 +17,12 @@ Originally built for large-scale qualitative research in educational scholarship
 
 ### 1. Clone or Update the Repo
 
-If you haven't already cloned the repo:
-
 ```bash
 git clone https://github.com/Technology-Educators-Alliance/py-extractor.git
 cd py-extractor
 ```
 
-If you've already cloned it, update to the latest version:
+Or update:
 
 ```bash
 git pull origin main
@@ -33,13 +30,11 @@ git pull origin main
 
 ### 2. Create and Activate a Virtual Environment
 
-Create the environment (same for all platforms):
-
 ```bash
 python3 -m venv venv
 ```
 
-Then activate it:
+Activate it:
 
 <details>
 <summary><strong>macOS / Linux</strong></summary>
@@ -59,8 +54,7 @@ source venv/bin/activate
 
 </details>
 
-
-### 3. Install dependencies
+### 3. Install Dependencies
 
 ```bash
 pip install --upgrade pip
@@ -70,22 +64,22 @@ pip install -r requirements.txt
 ### 4. Run the GUI
 
 ```bash
-python gui_openai_05_06_25v5.py
+python gui_openai_05_13_25v2.py
 ```
 
 **Features:**
 
-- 🔑 Enter OpenAI API key (masked)
+- 🔑 Optional: Enter your OpenAI API key (stored securely)
 - 📁 Choose a folder of PDFs
 - 🟢 Click **Run Extraction**
-- 🧾 Follow the debug output as it runs
-- 🧃 Click **Download CSV** when done!
+- 🧾 Watch live debug output
+- 🧃 Click **Download CSV** when complete
 
 ---
 
 ## 💻 Command-Line Interface (CLI)
 
-For power users and scripting workflows:
+For scripting and power users:
 
 ```bash
 cd cli
@@ -100,23 +94,39 @@ python py_extractor02v2.py --help
 
 ---
 
-## 📦 Key Files
+## 📆 Key Files
 
 | File | Purpose |
 |------|---------|
-| `gui_openai_05_06_25v5.py` | Main GUI with OpenAI + debug + CSV |
-| `metadata_extractor.py` | Shared helper for extracting headers, footers, metadata, DOIs |
-| `requirements.txt` | Dependencies: PySide6, PyMuPDF, pdfplumber, etc. |
-| `cli/py_extractor02v2.py` | CLI version for headless/automated use |
-| `setup_instructions.md` | One-page guide for quick onboarding |
+| `gui_openai_05_13_25v2.py` | Current GUI interface (OpenAI optional) |
+| `metadata_extractor.py` | Header/footer/metadata/DOI utilities |
+| `requirements.txt` | All required dependencies |
+| `cli/py_extractor02v2.py` | Command-line version for batch jobs |
+| `test_extractor.py` | Smoke tests for GUI behavior |
 
 ---
 
-## 🪪 License
+## 📟 Changelog
+
+- **v0.3.6** (May 13, 2025): Persist API key, improve prompt UX, disable download when results are empty
+- **v0.3.5** (Archived): Debug output refinements
+
+---
+
+## 🔭 Planned Features
+
+- Save/load settings between sessions
+- Drag-and-drop file interface
+- Inline preview of extracted content
+- Improved AI prompt targeting for positionality
+
+---
+
+## 🧪 License
 
 Licensed under **CC BY-NC 4.0**  
 For non-commercial, educational use only.  
-See [LICENSE.txt](LICENSE.txt) for full details.
+See [LICENSE.txt](LICENSE.txt) for full terms.
 
 ---
 
