@@ -56,7 +56,7 @@ def extract_metadata_pdfplumber(pdf_path):
 
 def extract_doi(pdf_path):
     """
-    Try extracting DOI by scanning text of first two pages.
+    Try extracting DOI by scanning text of the first two pages.
     """
     try:
         reader = PdfReader(pdf_path)
@@ -118,8 +118,8 @@ def extract_positionality(pdf_path):
     # Define tests
     tests = {
         "explicit_positionality": re.compile(r"\b(?:My|Our) positionality\b", re.IGNORECASE),
-        "first_person_reflexivity": re.compile(r"\bI (?:identify|situate|position)\b", re.IGNORECASE),
-        "researcher_self": re.compile(r"\bI.*?\bresearcher\b", re.IGNORECASE),
+        "first_person_reflexivity": re.compile(r"\bI (?:identify|situate|position|reflect|acknowledge)\b", re.IGNORECASE),
+        "researcher_self": re.compile(r"\bI,?\s*as a researcher\b", re.IGNORECASE),
         "author_self": re.compile(r"\bI.*?\bauthor\b", re.IGNORECASE),
         "as_a_role": re.compile(r"\bAs a [A-Z][a-z]+(?: [A-Z][a-z]+)*,\s*I\b", re.IGNORECASE),
     }
@@ -136,11 +136,9 @@ def extract_positionality(pdf_path):
     for hdr in ("Positionality", "Reflexivity", "Researcher Background"):
         hdr_pat = re.compile(rf"^\s*{hdr}\b", re.IGNORECASE | re.MULTILINE)
         if hdr_pat.search(full_text):
-            # take paragraph after header
             parts = full_text.splitlines()
             for idx, line in enumerate(parts):
                 if hdr_pat.match(line):
-                    # next non-empty line
                     for nxt in parts[idx+1:]:
                         if nxt.strip():
                             header_snip = nxt.strip()
@@ -154,8 +152,6 @@ def extract_positionality(pdf_path):
     gpt_snip = None
     try:
         # Place your prompt + call here; stub returns None
-        # response = openai.ChatCompletion.create(...)
-        # gpt_snip = response.choices[0].message.content.strip()
         pass
     except Exception:
         pass
