@@ -207,8 +207,10 @@ def extract_metadata(pdf_path):
             if not meta.get(k) and v:
                 meta[k] = v
 
-    if (not meta.get("journal") or not meta.get("volume") or not meta.get("author")) and meta.get("title"):
-        cr2 = crossref_lookup(text_meta.get("title", ""))
+        # Additional Crossref by title if needed
+    title_for_lookup = text_meta.get("title")
+    if title_for_lookup:
+        cr2 = crossref_lookup(title_for_lookup)
         for k in ("journal", "volume", "issue", "author"):
             if not meta.get(k) and cr2.get(k):
                 meta[k] = cr2[k]
