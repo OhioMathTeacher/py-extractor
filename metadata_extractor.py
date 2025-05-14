@@ -101,9 +101,7 @@ def extract_positionality(pdf_path):
      - GPT fallback (stub)
     Returns dict: matched_tests, snippets, score.
     """
-    # Load pages as text for scan
     with pdfplumber.open(pdf_path) as pdf:
-        # Determine end region (before references)
         ref_page = None
         for i, pg in enumerate(pdf.pages):
             if re.search(r"^\s*References\s*$", pg.extract_text() or "", re.IGNORECASE | re.MULTILINE):
@@ -114,7 +112,6 @@ def extract_positionality(pdf_path):
         pos_text = "\n".join(pdf.pages[start:end][j].extract_text() or "" for j in range(len(pdf.pages[start:end])))
         full_text = "\n".join(page.extract_text() or "" for page in pdf.pages)
 
-    # Define refined tests
     tests = {
         "explicit_positionality": re.compile(r"\b(?:My|Our) positionality\b", re.IGNORECASE),
         "first_person_reflexivity": re.compile(r"\bI\s+(?:reflect|acknowledge|consider|recognize)\b", re.IGNORECASE),
@@ -129,7 +126,7 @@ def extract_positionality(pdf_path):
         if m:
             matched.append(name)
             snippets[name] = m.group(0).strip()
-    # Header-based test
+
     header_snip = None
     for hdr in ("Positionality", "Reflexivity", "Researcher Background"):
         hdr_pat = re.compile(rf"^\s*{hdr}\b", re.IGNORECASE | re.MULTILINE)
@@ -146,10 +143,11 @@ def extract_positionality(pdf_path):
                     break
             if header_snip:
                 break
-    gpt_snip = None
-    if gpt_snip:
-        matched.append("gpt_fallback")
-        snippets["gpt_fallback"] = gpt_snip
+
+    # GPT fallback stub – not yet implemented
+    # if gpt_snip:
+    #     matched.append("gpt_fallback")
+    #     snippets["gpt_fallback"] = gpt_snip
 
     score = len(matched) / (len(tests) + 2)
     return {"matched_tests": matched, "snippets": snippets, "score": score}
@@ -160,20 +158,33 @@ def extract_metadata(pdf_path):
     meta.update(extract_metadata_pymupdf(pdf_path))
     text_meta = extract_metadata_pdfplumber(pdf_path)
     meta.update(text_meta)
-    if meta.get("doi"): meta["doi"] = meta["doi"].strip().rstrip('.;,')
+    if meta.get("doi"):
+        meta["doi"] = meta["doi"].strip().rstrip('.;,')
     if not meta.get("doi"):
         doi = extract_doi(pdf_path)
-        if doi: meta["doi"] = doi.strip().rstrip('.;,')
+        if doi:
+            meta["doi"] = doi.strip().rstrip('.;,')
     if meta.get("doi"):
         cr = crossref_lookup(meta["doi"])
         for k, v in cr.items():
-            if not meta.get(k) and v: meta[k] = v
+            if not meta.get(k) and v:
+                meta[k] = v
     if (not meta.get("journal") or not meta.get("volume") or not meta.get("author")) and meta.get("title"):
         cr2 = crossref_lookup(text_meta.get("title", ""))
         for k in ("journal", "volume", "issue", "author"):
-            if not meta.get(k) and cr2.get(k): meta[k] = cr2[k]
+            if not meta.get(k) and cr2.get(k):
+                meta[k] = cr2[k]
     pos = extract_positionality(pdf_path)
     meta["positionality_tests"] = pos.get("matched_tests")
     meta["positionality_snippets"] = pos.get("snippets")
     meta["positionality_score"] = pos.get("score")
+    # New: bucket confidence
+    score = meta.get("positionality_score", 0)
+    if score >= 0.75:
+        confidence = "high"
+    elif score >= 0.2:
+        confidence = "medium"
+    else:
+        confidence = "low"
+    meta["positionality_confidence"] = confidence
     return meta
