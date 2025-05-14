@@ -113,13 +113,44 @@ python py_extractor02v2.py --help
 
 ---
 
-## 🔭 Planned Features
+## 🔭 Planned Roadmap
 
+### 🔹 Version 0.4
+**User Preferences**
 - Save/load settings between sessions
-- Access PDFs remotely (e.g., from Google Drive or Dropbox)
-- Drag-and-drop file interface
-- Inline preview of extracted content
-- Improved AI prompt targeting for positionality
+- GUI Preferences menu (File > Preferences)
+- Toggle OpenAI usage
+- Set default folder location
+
+**Search & Output**
+- Add confidence scores to CSV
+- Show page number for each match
+- Enable raw text export (not just CSV)
+
+---
+
+### 🔹 Version 0.5
+**UI Enhancements**
+- Drag-and-drop PDF loading
+- Inline match preview panel
+- Toggle light/dark mode
+
+**Advanced CLI**
+- Batch job modes with config file support
+- Export results as JSON or HTML
+
+---
+
+### 🔹 Version 1.0
+**Remote Access & Extensibility**
+- Load PDFs from Google Drive or Dropbox
+- Plug-in system for custom search modules
+- Built-in sample testing and regression suite
+
+**Refinement**
+- Improved AI prompting based on role-specific templates
+- Multi-mode search: positionality, stance, ethics, identity
+- Professional installer (.dmg/.exe) for end users
 
 ---
 
