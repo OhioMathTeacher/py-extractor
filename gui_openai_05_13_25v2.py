@@ -6,6 +6,7 @@ import re
 import shutil
 from pathlib import Path
 from datetime import date, datetime
+from metadata_extractor import extract_metadata
 
 # Third‑party
 import pdfplumber
@@ -18,6 +19,10 @@ from PySide6.QtGui import QMovie
 from PySide6.QtCore import Qt, QSettings, QDir, QSize, QTimer
 from PyPDF2 import PdfReader
 import openai
+from openai import OpenAI
+# …rest of your imports
+client = OpenAI()
+
 
 # Your code
 from metadata_extractor import extract_metadata, crossref_lookup
@@ -27,31 +32,6 @@ PROMPT = (
     "In each academic article, identify a positionality statement where the authors describe their personal identity, background, experiences, assumptions, or biases. "
     "If present, briefly summarize in one sentence; if none is present, respond 'No positionality statement found.'"
 )
-
-# ----------------- Positionality Extraction -----------------
-def extract_positionality_from_pdf(pdf_path, custom_prompt):
-    try:
-        reader = PdfReader(pdf_path)
-        full_text = " ".join(page.extract_text() or "" for page in reader.pages)
-        snippet = full_text[:5000]
-        messages = [
-            {"role": "system", "content": (
-                "You are an assistant summarizing whether and how an author reflects on their own perspective. "
-                "Look for first-person reflections (I, we, my); if found, summarize why that counts as a positionality statement. "
-                "If none, say 'No positionality statement found.'"
-            )},
-            {"role": "user", "content": f"{custom_prompt}\n\n{snippet}"}
-        ]
-        resp = openai.chat.completions.create(
-            model="gpt-4o",
-            messages=messages,
-            max_tokens=100,
-            temperature=0.0
-        )
-        return resp.choices[0].message.content.strip()
-    except Exception as e:
-        return f"Error extracting positionality: {e}"
-# ------------------------------------------------------------
 
 class PDFExtractorGUI(QWidget):
     def __init__(self):
@@ -195,11 +175,6 @@ class PDFExtractorGUI(QWidget):
         pdfs = [p for p in os.listdir(folder) if p.lower().endswith(".pdf")]
         total = len(pdfs)
         found_count = 0
-        
-        # — Start the emoji spinner —
-        #self.spinner_label.show()
-        #self._spin_idx = 0
-        #self._spin_timer.start()
     
         # 3) Main loop over each PDF
         for i, fname in enumerate(pdfs, start=1):
@@ -217,36 +192,28 @@ class PDFExtractorGUI(QWidget):
                 except:
                     pass
 
-            # Positionality detection
-            #if self.keyword_radio.isChecked():
-            #    text = " ".join(
-            #        page.extract_text() or ""
-            #        for page in PdfReader(path).pages
-            #    )
-            #    m = re.search(r"\b(I|we)\b.*?\.", text)
-            #    found = bool(m)
-            #    stmt = m.group(0) if found else ""
-            #    rationale = (
-            #        "Found a first-person sentence via regex keyword match."
-            #        if found else
-            #        "No first-person sentence matched via regex."
-            #    )
-            # else:
-            summary = extract_positionality_from_pdf(
-                path, self.prompt_input.toPlainText()
-            )
-            conf = meta.get('positionality_confidence', 'low')
-            if meta.get('positionality_tests') and conf in ('medium','high'):
-                found = True
-                stmt = summary
-                rationale = f"Positionality detected (confidence={conf})."
-            else:
-                found = False
-                stmt = ""
-                rationale = f"No positionality statement found (confidence={conf})."
-            # end of per-PDF logic
+            meta = extract_metadata(path)
+            tests = meta.get("positionality_tests", [])
+            conf  = meta.get("positionality_confidence", "low")
+            snippets = meta.get("positionality_snippets") or {}
 
-    
+            # pick the best snippet to show
+            if "gpt_full_text" in snippets:
+                summary = snippets["gpt_full_text"]
+            elif "header" in snippets:
+                summary = snippets["header"]
+            elif "tail" in snippets:
+                summary = snippets.get("tail", "")
+            else:
+                summary = ""
+
+            found = bool(tests)
+            rationale = (
+                f"Positionality detected (confidence={conf})."
+                if found else
+                f"No positionality statement found (confidence={conf})."
+            )
+                
             # 4) Append to in-memory rows
             self.rows.append({
                 "Filename":  fname,

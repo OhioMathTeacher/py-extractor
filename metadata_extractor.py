@@ -311,6 +311,6 @@ def extract_metadata(pdf_path):
     meta["positionality_tests"] = pos.get("matched_tests")
     meta["positionality_snippets"] = pos.get("snippets")
     meta["positionality_score"] = pos.get("score")
-    sc = meta.get("positionality_score",0)
+    sc = meta.get("positionality_score", 0.0) or 0.0
     meta["positionality_confidence"] = "high" if sc>=0.75 else "medium" if sc>=0.2 else "low"
     return meta
