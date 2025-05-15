@@ -112,10 +112,6 @@ python py_extractor02v2.py --help
 
 ---
 
-## Changelog
-
-<!-- existing changelog entries -->
-
 ## 📟 Changelog
 
 - **v0.3.6** (May 13, 2025): Persist API key, improve prompt UX, disable download when results are empty
