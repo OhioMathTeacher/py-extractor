@@ -1,195 +1,91 @@
 # 🧠 Search Buddy (`py-extractor`)
 
-Extract **targeted content** from PDFs using AI or keyword search — via a simple **GUI** or **CLI**.
+Extract **targeted content** from PDFs using **AI analysis** — via a simple **GUI** or **CLI**.
 
-Originally built for large-scale qualitative research in educational scholarship, this Python app now includes a full-featured graphical interface for:
+> 🚀 **Latest Release: v0.3.7** — final GUI version, persistent settings, improved metadata mapping, and smoother extraction flow
 
-- 🧑‍🏫 Positionality statement detection  
-- 📄 Metadata & DOI extraction  
-- 📄 CSV export with live debug tracking
+---
 
-> 🚀 **Latest Release: v0.3.6** — persistent API key, improved prompt UX, and smarter CSV behavior  
-> 🔬 **Note:** Positionality detection is improving, but not all PDFs yield matches yet.
+## 🛠 Requirements
+
+* **Python** 3.10 or higher
+* **pip** (package installer)
+
+Install dependencies:
+
+```bash
+python3 -m pip install -r requirements.txt
+```
+
+Key libraries:
+
+* `openai` for AI-powered positionality detection
+* `PySide6` for the GUI
+* `pdfplumber` & `PyPDF2` for PDF parsing
+* `tabulate` for CLI output
 
 ---
 
 ## 🧰 Quick Setup (GUI)
 
-### 1. Clone or Update the Repo
+1. **Clone or update** the repository:
 
-```bash
-git clone https://github.com/Technology-Educators-Alliance/py-extractor.git
-cd py-extractor
-```
+   ```bash
+   git clone https://github.com/Technology-Educators-Alliance/py-extractor.git
+   cd py-extractor
+   # or, if already cloned:
+   git pull origin main
+   ```
 
-Or update:
+2. **Activate** your Python virtual environment:
 
-```bash
-git pull origin main
-```
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate
+   ```
 
-### 2. Create and Activate a Virtual Environment
+3. **Launch** the GUI:
 
-```bash
-python3 -m venv venv
-```
+   ```bash
+   python gui_openai_05_15_25v2.py
+   ```
 
-Activate it:
+4. **Use** the interface:
 
-<details>
-<summary><strong>macOS / Linux</strong></summary>
-
-```bash
-source venv/bin/activate
-```
-
-</details>
-
-<details>
-<summary><strong>Windows (PowerShell)</strong></summary>
-
-```powershell
-.\venv\Scripts\Activate.ps1
-```
-
-</details>
-
-### 3. Install Dependencies
-
-```bash
-pip install --upgrade pip
-pip install -r requirements.txt
-```
-
-### 4. Run the GUI
-
-```bash
-python gui_openai_05_13_25v2.py
-```
-
-**Features:**
-
-- 🔑 Optional: Enter your OpenAI API key (stored securely)
-- 📁 Choose a folder of PDFs
-- 🟢 Click **Run Extraction**
-- 🧾 Watch live debug output
-- 🧃 Click **Download CSV** when complete
+   * 🔑 Enter or confirm your OpenAI API key (auto‑saved between sessions)
+   * 📁 Click **Select Folder** and choose your PDF directory
+   * 🟢 Click **Run Extraction** to start processing
+   * 🧾 Watch live debug output as each file is processed
+   * 🧃 Click **Save CSV As...** (defaults to Desktop with timestamped filename)
 
 ---
 
 ## 💻 Command-Line Interface (CLI)
 
-For scripting and power users:
+Run a quick batch extraction without launching the GUI:
 
 ```bash
-cd cli
-python py_extractor02v2.py /path/to/your/pdfs --mode ai
+python scripts/sample_report.py /path/to/pdf/folder
 ```
 
-Use `--help` for options:
-
-```bash
-python py_extractor02v2.py --help
-```
+This outputs a Markdown-formatted table plus summary counts of detected positionality statements.
 
 ---
 
-## 📆 Key Files
+## 📝 Changelog & Roadmap
 
-| File | Purpose |
-|------|---------|
-| `gui_openai_05_13_25v2.py` | Current GUI interface (OpenAI optional) |
-| `metadata_extractor.py` | Header/footer/metadata/DOI utilities |
-| `requirements.txt` | All required dependencies |
-| `cli/py_extractor02v2.py` | Command-line version for batch jobs |
-| `test_extractor.py` | Smoke tests for GUI behavior |
+* **v0.3.7**: Final GUI layout; removed legacy options; fixed metadata key mapping; real-time progress updates
+* **v0.3.6**: Persistent API key; improved prompt UX; smarter CSV defaults
 
----
+**Upcoming**:
 
-## Utilities
+* Batch Dropbox/Drive integration
+* Enhanced AI prompt customization
 
-- `scripts/sample_report.py` — batch‑runs positionality extraction on a folder of PDFs and summarizes results.
+Contributions welcome! Fork, open an issue, or submit a pull request.
 
 ---
 
-## 📟 Changelog
+## 📄 License
 
-- **v0.3.6** (May 13, 2025): Persist API key, improve prompt UX, disable download when results are empty
-- **v0.3.5** (Archived): Debug output refinements
-
----
-
-## 🔭 Planned Roadmap
-
-### 🔹 Version 0.4
-**User Preferences**
-- Save/load settings between sessions
-- GUI Preferences menu (File > Preferences)
-- Toggle OpenAI usage
-- Set default folder location
-
-**Search & Output**
-- Add confidence scores to CSV
-- Show page number for each match
-- Enable raw text export (not just CSV)
-
----
-
-### 🔹 Version 0.5
-**UI Enhancements**
-- Drag-and-drop PDF loading
-- Inline match preview panel
-- Toggle light/dark mode
-
-**Advanced CLI**
-- Batch job modes with config file support
-- Export results as JSON or HTML
-
----
-
-### 🔹 Version 1.0
-**Remote Access & Extensibility**
-- Load PDFs from Google Drive or Dropbox
-- Plug-in system for custom search modules
-- Built-in sample testing and regression suite
-
-**Refinement**
-- Improved AI prompting based on role-specific templates
-- Multi-mode search: positionality, stance, ethics, identity
-- Professional installer (.dmg/.exe) for end users
-
----
-
-## 🧹 Known Issues & Planned Refactors
-
-This project evolved quickly and collaboratively—so there are a few inconsistencies:
-
-### File Naming
-- Some files use underscores (`gui_openai_05_13_25v2.py`), others use dashes (`dean-2021-reflexivity.pdf`)
-- CLI tools and GUI scripts don’t follow the same versioning convention
-
-### Directory Structure
-- Some scripts are in `/cli/`, others in root, tests are still in root
-- Future versions will consolidate scripts into clearly named subfolders:
-  - `/gui/`
-  - `/cli/`
-  - `/tests/`
-
-### UX & Codebase Notes
-- GUI lacks a proper `File > Preferences` dialog
-- `metadata_extractor.py` is doing a lot—may need refactoring into smaller utilities
-- `test_extractor.py` is a placeholder—more structured testing needed
-
-These issues are known and on the roadmap (see version plans below). Contributions welcome—especially if you want to help clean house!
-
----
-
-## 🧪 License
-
-Licensed under **CC BY-NC 4.0**  
-For non-commercial, educational use only.  
-See [LICENSE.txt](LICENSE.txt) for full terms.
-
----
-
-Happy extracting! 🧙‍♂️📚🔍
+Licensed under **CC BY-NC 4.0** (non-commercial educational use). See [LICENSE.txt](LICENSE.txt).
