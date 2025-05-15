@@ -47,7 +47,7 @@ Key libraries:
 3. **Launch** the GUI:
 
    ```bash
-   python gui_openai_05_15_25v2.py
+   python gui_openai_05_15_25v3.py
    ```
 
 4. **Use** the interface:
