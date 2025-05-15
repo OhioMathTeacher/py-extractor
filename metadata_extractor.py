@@ -4,7 +4,8 @@ import re
 import pdfplumber
 import requests
 from PyPDF2 import PdfReader
-import openai
+from openai import OpenAI
+client = OpenAI()
 
 
 def extract_metadata_pymupdf(pdf_path):
@@ -122,99 +123,157 @@ def datacite_lookup(doi):
         print(f"DataCite lookup returned invalid JSON for {doi}")
     return {}
 
+import re
+import pdfplumber
+import openai  # make sure your key is configured
+
 def extract_positionality(pdf_path):
     """
-    Multi-strategy positionality detection with GPT fallback and scoring.
-    Returns dict: matched_tests, snippets, score.
+    Extract positionality/reflexivity statements via regex + GPT header fallback + tail scan + conditional GPT-4 full-text pass.
+    Returns dict with keys: positionality_tests (list), positionality_snippets (dict), positionality_score (float).
     """
-    # compile footer matcher to stop at page‐footer lines
-    footer_re = re.compile(r"^HSR\s+\d+", re.IGNORECASE)
+    matched = []
+    snippets = {}
+    score = 0.0
 
-    # grab the 1–2 pages before the References section
-    with pdfplumber.open(pdf_path) as pdf:
-        ref_page = None
-        for i, pg in enumerate(pdf.pages):
-            text_pg = pg.extract_text() or ""
-            if re.search(r"^\s*References\s*$", text_pg, re.IGNORECASE | re.MULTILINE):
-                ref_page = i
-                break
-        start = ref_page - 2 if ref_page and ref_page >= 2 else max(len(pdf.pages) - 2, 0)
-        end   = ref_page or len(pdf.pages)
-        pos_text = "\n".join(
-            pdf.pages[j].extract_text() or ""
-            for j in range(start, end)
-        )
+    # 1) Header regex tests (first page)
+    try:
+        with pdfplumber.open(pdf_path) as pdf:
+            pages = pdf.pages
+            header_text = pages[0].extract_text() or ""
+    except Exception:
+        header_text = ""
 
-    # 1) Regex‐based quick tests
     tests = {
-        "explicit_positionality":    re.compile(r"\b(?:My|Our) positionality\b", re.IGNORECASE),
-        "first_person_reflexivity":  re.compile(r"\bI\s+(?:reflect|acknowledge|consider|recognize)\b", re.IGNORECASE),
-        "researcher_self":           re.compile(r"\bI,?\s*as a researcher,", re.IGNORECASE),
-        "author_self":               re.compile(r"\bI,?\s*as (?:the )?author,", re.IGNORECASE),
-        "as_a_role":                 re.compile(r"\bAs a [A-Z][a-z]+(?: [A-Z][a-z]+)*,\s*I\b", re.IGNORECASE),
+        "explicit_positionality":   re.compile(r"\b(?:My|Our) positionality\b", re.IGNORECASE),
+        "first_person_reflexivity": re.compile(r"\bI\s+(?:reflect|acknowledge|consider|recognize)\b", re.IGNORECASE),
+        "researcher_self":          re.compile(r"\bI,?\s*as a researcher,", re.IGNORECASE),
+        "author_self":              re.compile(r"\bI,?\s*as (?:the )?author,", re.IGNORECASE),
+        "as_a_role":                re.compile(r"\bAs a [A-Z][a-z]+(?: [A-Z][a-z]+)*,\s*I\b", re.IGNORECASE),
+        "I_position":               re.compile(r"\bI\s+(?:position|situat)\b", re.IGNORECASE),
+        "I_situated":               re.compile(r"\bI\s+situat\w*\b", re.IGNORECASE),
+        "positionality":            re.compile(r"\bpositionalit\w*\b", re.IGNORECASE),
+        "self_reflexivity":         re.compile(r"\bI\s+(?:reflect|reflective|reflexiv)\w*\b", re.IGNORECASE),
+
     }
-    matched, snippets = [], {}
+
     for name, pat in tests.items():
-        m = pat.search(pos_text)
+        m = pat.search(header_text)
         if m:
             matched.append(name)
             snippets[name] = m.group(0).strip()
-
-    # 2) Header‐based extraction, confined to pos_text, capped by lines & chars
-    lines = pos_text.splitlines()
-    MAX_LINES = 10
-    MAX_CHARS = 500
-    for hdr in ("Positionality", "Reflexivity", "Researcher Background"):
-        pat = re.compile(rf"^\s*{hdr}\b", re.IGNORECASE | re.MULTILINE)
-        if pat.search(pos_text):
-            paragraph = []
-            for idx, line in enumerate(lines):
-                if pat.match(line):
-                    # collect subsequent non-blank, non-footer lines
-                    for nxt in lines[idx+1:]:
-                        if not nxt.strip() or footer_re.match(nxt):
-                            break
-                        paragraph.append(nxt.strip())
-                        if len(paragraph) >= MAX_LINES:
-                            break
-                    break
-            snippet = " ".join(paragraph)
-            if len(snippet) > MAX_CHARS:
-                # truncate to last full word under char cap
-                snippet = snippet[:MAX_CHARS].rsplit(" ", 1)[0] + "…"
-            if snippet:
-                matched.append("header")
-                snippets["header"] = snippet
             break
 
-    # 3) GPT fallback for low-confidence cases
-    score_partial = len(matched) / (len(tests) + 1)  # regex + header
-    api_key = getattr(openai, "api_key", None) or os.getenv("OPENAI_API_KEY")
-    if score_partial < 0.2 and api_key:
-        openai.api_key = api_key
-        try:
-            prompt = (
-                "Extract the author's positionality or reflexivity statement "
-                "from the text below. If none exists, reply 'NONE':\n\n"
-                + pos_text
-            )
-            resp = openai.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.0,
-            )
-            gpt_snip = resp.choices[0].message.content.strip()
-            if gpt_snip.upper() != "NONE":
-                matched.append("gpt_fallback")
-                snippets["gpt_fallback"] = gpt_snip
-        except Exception as e:
-            print(f"GPT fallback error: {e}")
-    elif score_partial < 0.2:
-        print("Skipping GPT fallback: OPENAI_API_KEY not set")
+    # 2) GPT-fallback on header if no regex hit
+    if not matched and header_text:
+        snippet = header_text[:500]
+        resp = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a specialist in academic research methods. "
+                        "Find sentences where the author explicitly uses first‑person language "
+                        "to reflect on their own positionality or biases. "
+                        "If none exists in the passage, reply 'NONE'."
+                    )
+                },
+                {
+                    "role": "user",
+                    "content": (
+                        "Passage:\n\n" + header_text[:500]
+                    )
+                }
+            ],
+            temperature=0.0
+        )
 
-    # Final positionality confidence score (includes GPT)
-    score = len(matched) / (len(tests) + 2)
-    return {"matched_tests": matched, "snippets": snippets, "score": score}
+        answer = resp.choices[0].message.content.strip()
+        if answer.upper() != "NONE":
+            matched.append("gpt_header")
+            snippets["gpt_header"] = answer
+
+    # 3) Tail-end regex scan (last 2 pages)
+    try:
+        with pdfplumber.open(pdf_path) as pdf:
+            tail_text = "\n".join(p.extract_text() or "" for p in pdf.pages[-2:])
+    except Exception:
+        tail_text = ""
+
+    tail_hits = [name for name, pat in tests.items() if pat.search(tail_text)]
+    if tail_hits:
+        for name in tail_hits:
+            if name not in matched:
+                matched.append(name)
+            snippets.setdefault("tail_"+name, tail_text[:200] + "...")
+        score = max(score, 0.5)
+
+    # 4) Baseline score
+    if score == 0.0:
+        score = len(matched) / (len(tests) + 2)
+
+    # 5) Conditional full-text GPT-4 pass
+    try:
+        with pdfplumber.open(pdf_path) as pdf:
+            full_text = "\n".join(p.extract_text() or "" for p in pdf.pages)
+            page_count = len(pdf.pages)
+    except Exception:
+        full_text = ""
+        page_count = 0
+
+    # after computing `score` and loading full_text…
+
+    # only invoke full‐text GPT if:
+    # 1) there was some regex/tail signal (score ≥ 0.1)
+    # 2) and the PDF actually has a Discussion/Implications/Conclusion heading
+    needs_ai = (
+        score >= 0.1
+        and bool(re.search(r"\b(Discussion|Implications|Conclusion)\b",
+                           full_text,
+                           re.IGNORECASE))
+    )
+
+    if needs_ai:
+        m = re.search(r"(Discussion|Implications|Conclusion)", full_text, re.IGNORECASE)
+        tail = full_text[m.start():] if m else full_text
+        words = tail.split()
+        chunk_size = 500
+        for i in range(0, len(words), chunk_size):
+            chunk = " ".join(words[i:i+chunk_size])
+            resp = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are a specialist in academic research methods. "
+                            "Identify any first‑person (‘I’ or ‘we’) statements in this passage "
+                            "where the author Reflects on their own positionality or standpoint. "
+                            "If none exists, reply 'NO'."
+                        )
+                    },
+                    {
+                        "role": "user",
+                        "content": "Passage:\n\n" + chunk
+                    }
+                ],
+                temperature=0
+            )
+            answer = resp.choices[0].message.content.strip()
+            if answer.upper().startswith("YES"):
+                matched.append("gpt_full_text")
+                snippet = answer.splitlines()[1] if "\n" in answer else answer
+                snippets["gpt_full_text"] = snippet
+                score = 1.0
+                break
+
+    return {
+        "positionality_tests": matched,
+        "positionality_snippets": snippets,
+        "positionality_score": score
+    }
+
 
 def extract_metadata(pdf_path):
     meta = {}

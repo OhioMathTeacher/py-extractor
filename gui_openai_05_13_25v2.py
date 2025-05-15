@@ -87,13 +87,13 @@ class PDFExtractorGUI(QWidget):
 
 
         # Search mode radios
-        hbox = QHBoxLayout()
-        self.keyword_radio = QRadioButton("Keyword Search")
-        self.ai_radio      = QRadioButton("AI Analysis")
-        self.ai_radio.setChecked(True)
-        hbox.addWidget(self.keyword_radio)
-        hbox.addWidget(self.ai_radio)
-        layout.addLayout(hbox)
+        #hbox = QHBoxLayout()
+        #self.keyword_radio = QRadioButton("Keyword Search")
+        #self.ai_radio      = QRadioButton("AI Analysis")
+        #self.ai_radio.setChecked(True)
+        #hbox.addWidget(self.keyword_radio)
+        #hbox.addWidget(self.ai_radio)
+        #layout.addLayout(hbox)
 
         # For the AI prompt box, preload it with your default prompt:
         self.prompt_label = QLabel("Default AI Prompt (type in box to override):")
@@ -218,32 +218,32 @@ class PDFExtractorGUI(QWidget):
                     pass
 
             # Positionality detection
-            if self.keyword_radio.isChecked():
-                text = " ".join(
-                    page.extract_text() or ""
-                    for page in PdfReader(path).pages
-                )
-                m = re.search(r"\b(I|we)\b.*?\.", text)
-                found = bool(m)
-                stmt = m.group(0) if found else ""
-                rationale = (
-                    "Found a first-person sentence via regex keyword match."
-                    if found else
-                    "No first-person sentence matched via regex."
-                )
+            #if self.keyword_radio.isChecked():
+            #    text = " ".join(
+            #        page.extract_text() or ""
+            #        for page in PdfReader(path).pages
+            #    )
+            #    m = re.search(r"\b(I|we)\b.*?\.", text)
+            #    found = bool(m)
+            #    stmt = m.group(0) if found else ""
+            #    rationale = (
+            #        "Found a first-person sentence via regex keyword match."
+            #        if found else
+            #        "No first-person sentence matched via regex."
+            #    )
+            # else:
+            summary = extract_positionality_from_pdf(
+                path, self.prompt_input.toPlainText()
+            )
+            conf = meta.get('positionality_confidence', 'low')
+            if meta.get('positionality_tests') and conf in ('medium','high'):
+                found = True
+                stmt = summary
+                rationale = f"Positionality detected (confidence={conf})."
             else:
-                summary = extract_positionality_from_pdf(
-                    path, self.prompt_input.toPlainText()
-                )
-                conf = meta.get('positionality_confidence', 'low')
-                if meta.get('positionality_tests') and conf in ('medium','high'):
-                    found = True
-                    stmt = summary
-                    rationale = f"Positionality detected (confidence={conf})."
-                else:
-                    found = False
-                    stmt = ""
-                    rationale = f"No positionality statement found (confidence={conf})."
+                found = False
+                stmt = ""
+                rationale = f"No positionality statement found (confidence={conf})."
             # end of per-PDF logic
 
     
