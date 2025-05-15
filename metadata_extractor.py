@@ -1,12 +1,11 @@
 import os
+import openai
+openai.api_key = os.getenv("OPENAI_API_KEY", "")
 import fitz  # PyMuPDF
 import re
 import pdfplumber
 import requests
 from PyPDF2 import PdfReader
-from openai import OpenAI
-client = OpenAI()
-
 
 def extract_metadata_pymupdf(pdf_path):
     """
@@ -77,7 +76,7 @@ def crossref_lookup(doi_or_title):
     try:
         resp = requests.get(url, headers=headers, timeout=10)
         if resp.status_code != 200:
-            print(f"Crossref lookup returned status {resp.status_code} for {doi_or_title}")
+            #print(f"Crossref lookup returned status {resp.status_code} for {doi_or_title}")
             return {}
         data = resp.json()
         item = data["message"]["items"][0] if not doi_or_title.startswith("10.") else data["message"]
@@ -91,8 +90,8 @@ def crossref_lookup(doi_or_title):
     except requests.RequestException as e:
         print(f"Crossref lookup network error for {doi_or_title}: {e}")
     except ValueError:
-        print(f"Crossref lookup returned invalid JSON for {doi_or_title}")
-    return {}
+        #print(f"Crossref lookup returned invalid JSON for {doi_or_title}")
+        return {}
 
 
 def datacite_lookup(doi):
@@ -167,7 +166,7 @@ def extract_positionality(pdf_path):
     # 2) GPT-fallback on header if no regex hit
     if not matched and header_text:
         snippet = header_text[:500]
-        resp = client.chat.completions.create(
+        resp = openai.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
                 {
@@ -241,7 +240,7 @@ def extract_positionality(pdf_path):
         chunk_size = 500
         for i in range(0, len(words), chunk_size):
             chunk = " ".join(words[i:i+chunk_size])
-            resp = client.chat.completions.create(
+            resp = openai.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
                     {
@@ -308,9 +307,11 @@ def extract_metadata(pdf_path):
             meta["author_from_filename"] = auth
 
     pos = extract_positionality(pdf_path)
-    meta["positionality_tests"] = pos.get("matched_tests")
-    meta["positionality_snippets"] = pos.get("snippets")
-    meta["positionality_score"] = pos.get("score")
+    meta["positionality_tests"]   = pos.get("positionality_tests", [])
+    meta["positionality_snippets"] = pos.get("positionality_snippets", {})
+    meta["positionality_score"]    = pos.get("positionality_score", 0.0)
     sc = meta.get("positionality_score", 0.0) or 0.0
     meta["positionality_confidence"] = "high" if sc>=0.75 else "medium" if sc>=0.2 else "low"
     return meta
+
+

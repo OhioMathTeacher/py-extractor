@@ -206,6 +206,8 @@ class PDFExtractorGUI(QWidget):
                 summary = snippets.get("tail", "")
             else:
                 summary = ""
+            # for GUI row output:
+            stmt = summary
 
             found = bool(tests)
             rationale = (
