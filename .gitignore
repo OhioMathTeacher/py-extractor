@@ -178,3 +178,4 @@ cython_debug/
 .DS_Store
 *.bak
 *.pkg
+Fraction_Match_Shapes.png
